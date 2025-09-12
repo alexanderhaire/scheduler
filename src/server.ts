@@ -266,8 +266,8 @@ app.post('/schedule', async (req, reply) => {
     try {
       const fb = await calendar.freebusy.query({
         requestBody: {
-          timeMin: startDt.toUTC().toISO(),
-          timeMax: end.toUTC().toISO(),
+          timeMin: startDt.toUTC().toISO() || undefined,
+          timeMax: end.toUTC().toISO() || undefined,
           items: [{ id: CALENDAR_ID }],
         },
       });
@@ -279,8 +279,8 @@ app.post('/schedule', async (req, reply) => {
 
       const params: calendar_v3.Params$Resource$Events$List = {
         calendarId: CALENDAR_ID,
-        timeMin: startDt.toUTC().toISO(),
-        timeMax: end.toUTC().toISO(),
+        timeMin: startDt.toUTC().toISO() || undefined,
+        timeMax: end.toUTC().toISO() || undefined,
         singleEvents: true,
         orderBy: 'startTime',
         maxResults: 1,
