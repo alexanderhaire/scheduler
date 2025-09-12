@@ -1,0 +1,32 @@
+{
+  "name": "eliza-scheduler",
+  "version": "1.0.0",
+  "description": "Standalone Google Calendar scheduler service",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "chrono-node": "^2.7.6",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "googleapis": "^144.0.0",
+    "luxon": "^3.4.4",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
