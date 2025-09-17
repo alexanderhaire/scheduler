@@ -11,14 +11,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@fastify/cors": "^9.0.1",
-    "chrono-node": "^2.7.6",
+    "@fastify/cors": "^11.1.0",
+    "chrono-node": "^2.8.4",
     "dotenv": "^16.4.5",
-    "fastify": "^4.28.1",
-    "googleapis": "^144.0.0",
-    "luxon": "^3.4.4",
-    "uuid": "^10.0.0",
-    "zod": "^3.23.8"
+    "fastify": "^5.6.0",
+    "googleapis": "^160.0.0",
+    "luxon": "^3.7.2",
+    "uuid": "^13.0.0",
+    "zod": "^4.1.9"
   },
   "devDependencies": {
     "@types/luxon": "^3.3.0",
