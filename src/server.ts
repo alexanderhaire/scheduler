@@ -160,7 +160,9 @@ function makeScheduler(cal: calendar_v3.Calendar) {
     const bumped = chosenUTC.toMillis() !== roundedReqUTC.toMillis();
 
     const startLocal = chosenUTC.setZone(tz);
-    const { startDateTime, endDateTime } = buildEventTimes(startLocal, SLOT_MINUTES);
+    const startDateTime = startLocal.toISO({ suppressMilliseconds: true })!;
+    const endDateTime   = startLocal.plus({ minutes: SLOT_MINUTES })
+                                .toISO({ suppressMilliseconds: true })!;
 
     // Optional idempotency key to avoid double-booking on concurrent PUTs.
     const externalKey = [
