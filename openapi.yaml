@@ -1,0 +1,101 @@
+openapi: 3.1.0
+info:
+  title: Eliza Scheduler
+  version: 1.0.0
+servers:
+  - url: http://localhost:4005
+paths:
+  /v1/availability/soonest:
+    get:
+      summary: Return the next free 5-minute slot
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: ISO datetime (any tz). Rounded up to nearest 5 minutes.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Soonest slot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [startIso, endIso, slotMinutes, tz, calendarId]
+                properties:
+                  startIso:
+                    type: string
+                    format: date-time
+                  endIso:
+                    type: string
+                    format: date-time
+                  slotMinutes:
+                    type: integer
+                    enum: [5]
+                  tz:
+                    type: string
+                    example: America/New_York
+                  calendarId:
+                    type: string
+        "400":
+          description: Bad input
+        "500":
+          description: Calendar error
+  /v1/meetings:
+    put:
+      summary: Schedule at requested time, bumping forward by 5 minutes if busy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestedStartIso]
+              properties:
+                requestedStartIso:
+                  type: string
+                  format: date-time
+                email:
+                  type: string
+                  format: email
+                label:
+                  type: string
+                tz:
+                  type: string
+                  example: America/New_York
+                summary:
+                  type: string
+                  example: Grand Villa Tour
+                location:
+                  type: string
+                  example: Grand Villa of Clearwater
+      responses:
+        "200":
+          description: Scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [scheduledStartIso, scheduledEndIso, bumpedFromRequested, slotMinutes]
+                properties:
+                  scheduledStartIso:
+                    type: string
+                    format: date-time
+                  scheduledEndIso:
+                    type: string
+                    format: date-time
+                  bumpedFromRequested:
+                    type: boolean
+                  eventId:
+                    type: string
+                  htmlLink:
+                    type: string
+                  slotMinutes:
+                    type: integer
+                    enum: [5]
+        "400":
+          description: Bad input
+        "500":
+          description: Calendar error
