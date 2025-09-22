@@ -172,10 +172,16 @@ components:
 
     ErrorResponse:
       type: object
+      required: [error]
       properties:
-        code:
+        error:
           type: string
+          description: Machine-readable error identifier.
           example: bad_request
         message:
           type: string
+          description: Human-readable message describing the error.
           example: Invalid date format
+        details:
+          type: object
+          description: Additional error context, such as validation details.
