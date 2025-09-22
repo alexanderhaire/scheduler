@@ -3,99 +3,185 @@ info:
   title: Eliza Scheduler
   version: 1.0.0
 servers:
+  - url: https://scheduler-production-a81f.up.railway.app/
+    description: Production (Railway)
   - url: http://localhost:4005
+    description: Local development
+tags:
+  - name: Availability
+  - name: Meetings
 paths:
   /v1/availability/soonest:
     get:
+      tags: [Availability]
       summary: Return the next free 5-minute slot
+      operationId: getSoonestAvailability
       parameters:
         - name: from
           in: query
           required: false
-          description: ISO datetime (any tz). Rounded up to nearest 5 minutes.
+          description: ISO datetime (any tz). Rounded up to nearest 5 minutes before searching.
           schema:
             type: string
             format: date-time
+          example: "2025-09-22T17:30:00-04:00"
       responses:
         "200":
           description: Soonest slot
           content:
             application/json:
               schema:
-                type: object
-                required: [startIso, endIso, slotMinutes, tz, calendarId]
-                properties:
-                  startIso:
-                    type: string
-                    format: date-time
-                  endIso:
-                    type: string
-                    format: date-time
-                  slotMinutes:
-                    type: integer
-                    enum: [5]
-                  tz:
-                    type: string
-                    example: America/New_York
-                  calendarId:
-                    type: string
+                $ref: "#/components/schemas/AvailabilityResponse"
+              examples:
+                ok:
+                  value:
+                    startIso: "2025-09-22T21:40:00.000Z"
+                    endIso: "2025-09-22T21:45:00.000Z"
+                    slotMinutes: 5
+                    tz: "America/New_York"
+                    calendarId: "primary"
         "400":
           description: Bad input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Calendar error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/meetings:
     put:
+      tags: [Meetings]
       summary: Schedule at requested time, bumping forward by 5 minutes if busy
+      operationId: putMeeting
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [requestedStartIso]
-              properties:
-                requestedStartIso:
-                  type: string
-                  format: date-time
-                email:
-                  type: string
-                  format: email
-                label:
-                  type: string
-                tz:
-                  type: string
-                  example: America/New_York
-                summary:
-                  type: string
-                  example: Grand Villa Tour
-                location:
-                  type: string
-                  example: Grand Villa of Clearwater
+              $ref: "#/components/schemas/MeetingRequest"
+            examples:
+              request:
+                value:
+                  requestedStartIso: "2025-09-22T17:30:00-04:00"
+                  email: "alex@example.com"
+                  label: "Tour with Diana"
       responses:
         "200":
           description: Scheduled
           content:
             application/json:
               schema:
-                type: object
-                required: [scheduledStartIso, scheduledEndIso, bumpedFromRequested, slotMinutes]
-                properties:
-                  scheduledStartIso:
-                    type: string
-                    format: date-time
-                  scheduledEndIso:
-                    type: string
-                    format: date-time
-                  bumpedFromRequested:
-                    type: boolean
-                  eventId:
-                    type: string
-                  htmlLink:
-                    type: string
-                  slotMinutes:
-                    type: integer
-                    enum: [5]
+                $ref: "#/components/schemas/MeetingResponse"
+              examples:
+                scheduled:
+                  value:
+                    scheduledStartIso: "2025-09-22T21:40:00.000Z"
+                    scheduledEndIso: "2025-09-22T21:45:00.000Z"
+                    bumpedFromRequested: true
+                    eventId: "0td1fcer23so5pmbg1iar86fkc"
+                    htmlLink: "https://www.google.com/calendar/event?eid=..."
+                    slotMinutes: 5
         "400":
           description: Bad input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Calendar error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    AvailabilityResponse:
+      type: object
+      required: [startIso, endIso, slotMinutes, tz, calendarId]
+      properties:
+        startIso:
+          type: string
+          format: date-time
+        endIso:
+          type: string
+          format: date-time
+        slotMinutes:
+          type: integer
+          enum: [5]
+          description: Slot size (minutes)
+        tz:
+          type: string
+          example: America/New_York
+        calendarId:
+          type: string
+          example: primary
+
+    MeetingRequest:
+      type: object
+      required: [requestedStartIso, email]
+      properties:
+        requestedStartIso:
+          type: string
+          format: date-time
+          description: Preferred start time (any tz). Will be bumped forward to next free 5-min slot if busy.
+        email:
+          type: string
+          format: email
+          description: Attendee email used for the calendar invite.
+        label:
+          type: string
+          description: Freeform label to associate with the meeting.
+        tz:
+          type: string
+          example: America/New_York
+          description: Optional override for calendar timezone.
+        summary:
+          type: string
+          example: Grand Villa Tour
+        location:
+          type: string
+          example: Grand Villa of Clearwater
+
+    MeetingResponse:
+      type: object
+      required: [scheduledStartIso, scheduledEndIso, bumpedFromRequested, slotMinutes]
+      properties:
+        scheduledStartIso:
+          type: string
+          format: date-time
+        scheduledEndIso:
+          type: string
+          format: date-time
+        bumpedFromRequested:
+          type: boolean
+        eventId:
+          type: string
+          description: Calendar event id, when created against Google Calendar.
+        htmlLink:
+          type: string
+          description: Link to view the event in Google Calendar.
+        slotMinutes:
+          type: integer
+          enum: [5]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error identifier.
+          example: bad_request
+        message:
+          type: string
+          description: Human-readable message describing the error.
+          example: Invalid date format
+        details:
+          type: object
+          description: Additional error context, such as validation details.
