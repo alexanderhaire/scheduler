@@ -16,10 +16,20 @@ import { dirname, resolve } from 'node:path';
 /* =========================
    Env & constants
 ========================= */
-const REQUIRED_ENV = ['CLIENT_ID', 'CLIENT_SECRET', 'REDIRECT_URI'] as const;
-for (const key of REQUIRED_ENV) {
-  if (!process.env[key]) throw new Error(`Environment variable ${key} is required`);
+function readEnv(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
 }
+
+const CLIENT_ID = readEnv('GOOGLE_CLIENT_ID', 'CLIENT_ID');
+const CLIENT_SECRET = readEnv('GOOGLE_CLIENT_SECRET', 'CLIENT_SECRET');
+const REDIRECT_URI = readEnv('GOOGLE_REDIRECT_URI', 'REDIRECT_URI') ?? 'http://localhost:4005/oauth2callback';
+
+if (!CLIENT_ID) throw new Error('Environment variable GOOGLE_CLIENT_ID (or CLIENT_ID) is required');
+if (!CLIENT_SECRET) throw new Error('Environment variable GOOGLE_CLIENT_SECRET (or CLIENT_SECRET) is required');
 
 const PORT: number = Number(process.env.PORT ?? 4005);
 const DEFAULT_TZ: string = process.env.TZ || 'America/New_York';
@@ -80,11 +90,7 @@ async function saveUserTokens(userId: string, tokens: StoredTokens) {
    OAuth helpers
 ========================= */
 function createOAuthClient(): OAuth2Client {
-  return new google.auth.OAuth2(
-    process.env.CLIENT_ID!,
-    process.env.CLIENT_SECRET!,
-    process.env.REDIRECT_URI!
-  );
+  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 }
 
 async function getUserInfo(auth: OAuth2Client): Promise<{ id: string; email?: string }> {
@@ -98,7 +104,11 @@ async function getUserInfo(auth: OAuth2Client): Promise<{ id: string; email?: st
 /* =========================
    Calendar per-user
 ========================= */
-async function getCalendarForUser(userId: string): Promise<calendar_v3.Calendar> {
+async function getCalendarForUser(
+  userId: string,
+  override?: calendar_v3.Calendar
+): Promise<calendar_v3.Calendar> {
+  if (override) return override;
   const tokens = await loadUserTokens(userId);
   if (!tokens?.refresh_token && !tokens?.access_token) throw new Error('auth_required');
   const oauth = createOAuthClient();
@@ -284,7 +294,7 @@ const PutMeetingBody = z.object({
 /* =========================
    Build the server
 ========================= */
-export async function buildServer(): Promise<FastifyInstance> {
+export async function buildServer(calendarOverride?: calendar_v3.Calendar): Promise<FastifyInstance> {
   const app: FastifyInstance = Fastify({ logger: true });
 
   await app.register(cors, { origin: true, methods: ['GET', 'PUT', 'OPTIONS'] });
@@ -380,6 +390,11 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   /* ----- Who am I? (helpful for the UI) ----- */
   app.get('/me', async (req, reply) => {
+    if (calendarOverride) {
+      reply.send({ authenticated: true, userId: 'service-user', email: null });
+      return;
+    }
+
     const uid = (req.cookies as any)?.[COOKIE_NAME];
     if (!uid) return reply.status(401).send({ authenticated: false, login: '/auth/google' });
     const tokens = await loadUserTokens(uid);
@@ -394,6 +409,8 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   /* ----- Simple auth guard ----- */
   async function requireUser(req: FastifyRequest, reply: FastifyReply): Promise<string | undefined> {
+    if (calendarOverride) return 'service-user';
+
     const uid = (req.cookies as any)?.[COOKIE_NAME];
     if (!uid) {
       reply.status(401).send({ error: 'auth_required', login: '/auth/google' });
@@ -419,7 +436,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       const base = fromStr ? DateTime.fromISO(fromStr, { setZone: true }) : DateTime.now();
       if (!base.isValid) return reply.status(400).send({ error: 'invalid_from' });
 
-      const cal = await getCalendarForUser(uid);
+      const cal = await getCalendarForUser(uid, calendarOverride);
       const calId = DEFAULT_CALENDAR_ID; // 'primary' by default
       const { findFirstFreeSlotFromUTC } = makeScheduler(cal, calId);
 
@@ -456,7 +473,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       const requested = DateTime.fromISO(requestedStartIso, { setZone: true });
       if (!requested.isValid) return reply.status(400).send({ error: 'invalid_requestedStartIso' });
 
-      const cal = await getCalendarForUser(uid);
+      const cal = await getCalendarForUser(uid, calendarOverride);
       const calId = DEFAULT_CALENDAR_ID;
       const { scheduleAtOrNextUTC } = makeScheduler(cal, calId);
 
