@@ -27,18 +27,24 @@ const REDIRECT_URI =
   process.env.GOOGLE_REDIRECT_URI ??
   `http://127.0.0.1:${PORT}/oauth2callback`;
 
+let parsedRedirectURL: URL;
+try {
+  parsedRedirectURL = new URL(REDIRECT_URI);
+  if (parsedRedirectURL.pathname !== '/oauth2callback') {
+    throw new Error(`REDIRECT_URI must end with /oauth2callback, got ${REDIRECT_URI}`);
+  }
+} catch (err) {
+  if (err instanceof Error && err.message.startsWith('REDIRECT_URI must')) {
+    throw err;
+  }
+  throw new Error(`Invalid REDIRECT_URI: ${REDIRECT_URI}`);
+}
+
 if (!CLIENT_ID) throw new Error('Environment variable CLIENT_ID is required');
 if (!CLIENT_SECRET) throw new Error('Environment variable CLIENT_SECRET is required');
 if (!REDIRECT_URI) throw new Error('Environment variable REDIRECT_URI is required');
 
-const REDIRECT_PATH = (() => {
-  try {
-    const { pathname } = new URL(REDIRECT_URI);
-    return pathname || '/oauth2callback';
-  } catch {
-    return '/oauth2callback';
-  }
-})();
+const REDIRECT_PATH = parsedRedirectURL.pathname || '/oauth2callback';
 
 const COOKIE_NAME = 'uid'; // stores Google user ID (from userinfo.id)
 const COOKIE_SECRET = process.env.COOKIE_SECRET || 'dev-cookie-secret';
@@ -302,7 +308,15 @@ const PutMeetingBody = z.object({
 export async function buildServer(calendarOverride?: calendar_v3.Calendar): Promise<FastifyInstance> {
   const app: FastifyInstance = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true, methods: ['GET', 'PUT', 'OPTIONS'] });
+  app.log.info(
+    {
+      usingClientId: `${(CLIENT_ID ?? '').slice(0, 16)}…`,
+      redirectUri: REDIRECT_URI,
+    },
+    'oauth_config'
+  );
+
+  await app.register(cors, { origin: true, methods: ['GET', 'PUT', 'OPTIONS'], credentials: true });
   await app.register(cookie, { secret: COOKIE_SECRET, hook: 'onRequest' });
 
   // Serve static UI from /public (index.html, app.html, etc.)
